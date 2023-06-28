@@ -101,42 +101,44 @@ class cifar10Nosiy(datasets.CIFAR10):
 
 
 class cifar100Nosiy(datasets.CIFAR100):
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False, nosiy_rate=0.0, asym=False, seed=0):
+    def __init__(self, root, train=True, transform=None, target_transform=None, download=False, noisy_rate=0.0, asym=False, seed=0):
         super(cifar100Nosiy, self).__init__(root, download=download, transform=transform, target_transform=target_transform)
         if asym:
             """mistakes are inside the same superclass of 10 classes, e.g. 'fish'
             """
             nb_classes = 100
             P = np.eye(nb_classes)
-            n = nosiy_rate
             nb_superclasses = 20
             nb_subclasses = 5
 
-            if n > 0.0:
+            if noisy_rate > 0.0:
                 for i in np.arange(nb_superclasses):
                     init, end = i * nb_subclasses, (i+1) * nb_subclasses
-                    P[init:end, init:end] = build_for_cifar100(nb_subclasses, n)
+                    P[init:end, init:end] = build_for_cifar100(nb_subclasses, noisy_rate)
 
-                    y_train_noisy = multiclass_noisify(np.array(self.targets), P=P, random_state=seed)
-                    actual_noise = (y_train_noisy != np.array(self.targets)).mean()
+                y_train_noisy = multiclass_noisify(np.array(self.targets), P=P, random_state=seed)   # === error: this should be executed after the for loop
+                actual_noise = (y_train_noisy != np.array(self.targets)).mean()
                 assert actual_noise > 0.0
                 print('Actual noise %.2f' % actual_noise)
                 self.targets = y_train_noisy.tolist()
             return
-        elif nosiy_rate > 0:
+
+        elif noisy_rate > 0:
             n_samples = len(self.targets)
-            n_noisy = int(nosiy_rate * n_samples)
+            n_noisy = int(noisy_rate * n_samples)
             print("%d Noisy samples" % (n_noisy))
-            class_index = [np.where(np.array(self.targets) == i)[0] for i in range(100)]
-            class_noisy = int(n_noisy / 100)
+            class_noisy = int(n_noisy / 100)  # num of noisy samples per class
+
             noisy_idx = []
+            class_index = [np.where(np.array(self.targets) == i)[0] for i in range(100)]
             for d in range(100):
                 noisy_class_index = np.random.choice(class_index[d], class_noisy, replace=False)
                 noisy_idx.extend(noisy_class_index)
                 print("Class %d, number of noisy % d" % (d, len(noisy_class_index)))
             for i in noisy_idx:
                 self.targets[i] = other_class(n_classes=100, current_class=self.targets[i])
-            print(len(noisy_idx))
+            print('total number of noisy samples {}'.format(len(noisy_idx)))
+
             print("Print noisy label generation statistics:")
             for i in range(100):
                 n_noisy = np.sum(np.array(self.targets) == i)
@@ -145,7 +147,7 @@ class cifar100Nosiy(datasets.CIFAR100):
 
 
 class DatasetGenerator():
-    def __init__(self, batchSize=128, eval_batch_size=256, dataPath='../../datasets',
+    def __init__(self, batchSize=128, eval_batch_size=256, dataPath='../dataset',
                  seed=123, numOfWorkers=4, asym=False, dataset_type='cifar10',
                  is_cifar100=False, cutout_length=16, noise_rate=0.4):
         self.seed = seed
@@ -186,7 +188,7 @@ class DatasetGenerator():
                                           download=True,
                                           asym=self.asym,
                                           seed=self.seed,
-                                          nosiy_rate=self.noise_rate)
+                                          noisy_rate=self.noise_rate)
 
             test_dataset = datasets.CIFAR100(root=self.dataPath,
                                              train=False,

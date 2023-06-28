@@ -1,0 +1,5 @@
+*.pyc
+.idea
+*.xml
+__pycache__
+logs

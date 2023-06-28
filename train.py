@@ -10,28 +10,6 @@ from utils.utils import AverageMeter, accuracy, count_parameters_in_MB
 from train_util import TrainUtil
 from loss import SCELoss
 
-# ArgParse
-parser = argparse.ArgumentParser(description='SCE Loss')
-parser.add_argument('--lr', type=float, default=0.01)
-parser.add_argument('--l2_reg', type=float, default=5e-4)
-parser.add_argument('--grad_bound', type=float, default=5.0)
-parser.add_argument('--train_log_every', type=int, default=100)
-parser.add_argument('--resume', action='store_true', default=False)
-parser.add_argument('--batch_size', type=int, default=128)
-parser.add_argument('--data_path', default='../../datasets', type=str)
-parser.add_argument('--checkpoint_path', default='checkpoints', type=str)
-parser.add_argument('--data_nums_workers', type=int, default=8)
-parser.add_argument('--epoch', type=int, default=120)
-parser.add_argument('--nr', type=float, default=0.4, help='noise_rate')
-parser.add_argument('--loss', type=str, default='SCE', help='SCE, CE')
-parser.add_argument('--alpha', type=float, default=1.0, help='alpha scale')
-parser.add_argument('--beta', type=float, default=1.0, help='beta scale')
-parser.add_argument('--version', type=str, default='SCE0.0', help='Version')
-parser.add_argument('--dataset_type', choices=['cifar10', 'cifar100'], type=str, default='cifar10')
-parser.add_argument('--asym', action='store_true', default=False)
-parser.add_argument('--seed', type=int, default=123)
-
-args = parser.parse_args()
 GLOBAL_STEP, EVAL_STEP, EVAL_BEST_ACC, EVAL_BEST_ACC_TOP5 = 0, 0, 0, 0
 cell_arc = None
 
@@ -63,22 +41,6 @@ def adjust_weight_decay(model, l2_value):
     params = [{'params': conv, 'weight_decay': l2_value}, {'params': fc, 'weight_decay': 0.01}]
     print(fc)
     return params
-
-
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-log_file_name = os.path.join('logs', args.version + '.log')
-logger = setup_logger(name=args.version, log_file=log_file_name)
-for arg in vars(args):
-    logger.info("%s: %s" % (arg, getattr(args, arg)))
-
-if torch.cuda.is_available():
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
-    device = torch.device('cuda')
-    logger.info("Using CUDA!")
-else:
-    device = torch.device('cpu')
 
 
 def log_display(epoch, global_step, time_elapse, **kwargs):
@@ -147,6 +109,7 @@ def train_fixed(starting_epoch, data_loader, fixed_cnn, criterion, fixed_cnn_opt
         for images, labels in tqdm(data_loader["train_dataset"]):
             images, labels = images.to(device), labels.to(device)
             start = time.time()
+
             fixed_cnn.zero_grad()
             fixed_cnn_optmizer.zero_grad()
             pred = fixed_cnn(images)
@@ -180,6 +143,7 @@ def train_fixed(starting_epoch, data_loader, fixed_cnn, criterion, fixed_cnn_opt
                                       lr=lr,
                                       gn=grad_norm)
                 logger.info(display)
+
         fixed_cnn_scheduler.step()
         logger.info("="*20 + "Eval" + "="*20)
         curr_acc, curr_acc5 = model_eval(epoch, fixed_cnn, data_loader)
@@ -198,7 +162,8 @@ def train_fixed(starting_epoch, data_loader, fixed_cnn, criterion, fixed_cnn_opt
 
 def train():
     global GLOBAL_STEP, reduction_arc, cell_arc
-    # Dataset
+
+    # ================== Load Dataset ==================
     dataset = DatasetGenerator(batchSize=args.batch_size,
                                dataPath=args.data_path,
                                numOfWorkers=args.data_nums_workers,
@@ -244,4 +209,41 @@ def train():
 
 
 if __name__ == '__main__':
+    # ArgParse
+    parser = argparse.ArgumentParser(description='SCE Loss')
+    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--l2_reg', type=float, default=5e-4)
+    parser.add_argument('--grad_bound', type=float, default=5.0)
+    parser.add_argument('--train_log_every', type=int, default=100)
+    parser.add_argument('--resume', action='store_true', default=False)
+    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--data_path', default='../dataset', type=str)
+    parser.add_argument('--checkpoint_path', default='checkpoints', type=str)
+    parser.add_argument('--data_nums_workers', type=int, default=8)
+    parser.add_argument('--epoch', type=int, default=120)
+    parser.add_argument('--nr', type=float, default=0.4, help='noise_rate')
+    parser.add_argument('--loss', type=str, default='SCE', help='SCE, CE')
+    parser.add_argument('--alpha', type=float, default=1.0, help='alpha scale')
+    parser.add_argument('--beta', type=float, default=1.0, help='beta scale')
+    parser.add_argument('--version', type=str, default='SCE0.0', help='Version')
+    parser.add_argument('--dataset_type', choices=['cifar10', 'cifar100'], type=str, default='cifar10')
+    parser.add_argument('--asym', action='store_true', default=False)
+    parser.add_argument('--seed', type=int, default=123)
+    args = parser.parse_args()
+
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    log_file_name = os.path.join('logs', args.version + '.log')
+    logger = setup_logger(name=args.version, log_file=log_file_name)
+    for arg in vars(args):
+        logger.info("%s: %s" % (arg, getattr(args, arg)))
+
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = True
+        device = torch.device('cuda')
+        logger.info("Using CUDA!")
+    else:
+        device = torch.device('cpu')
+
     train()
