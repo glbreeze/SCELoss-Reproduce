@@ -8,7 +8,7 @@ from dataset import DatasetGenerator
 from tqdm import tqdm
 from utils.utils import AverageMeter, accuracy, count_parameters_in_MB
 from train_util import TrainUtil
-from loss import SCELoss
+from loss import SCELoss, DotLoss, CrossEntropyLabelSmooth
 
 GLOBAL_STEP, EVAL_STEP, EVAL_BEST_ACC, EVAL_BEST_ACC_TOP5 = 0, 0, 0, 0
 cell_arc = None
@@ -188,6 +188,10 @@ def train():
         criterion = SCELoss(alpha=args.alpha, beta=args.beta, num_classes=num_classes)
     elif args.loss == 'CE':
         criterion = torch.nn.CrossEntropyLoss()
+    elif args.loss == 'dot':
+        criterion = DotLoss(epsilon=args.epsilon, num_classes=num_classes)
+    elif args.loss == 'ls':
+        criterion = CrossEntropyLabelSmooth(epsilon=args.epsilon, num_classes=num_classes)
     else:
         logger.info("Unknown loss")
 
@@ -225,6 +229,7 @@ if __name__ == '__main__':
     parser.add_argument('--loss', type=str, default='SCE', help='SCE, CE')
     parser.add_argument('--alpha', type=float, default=1.0, help='alpha scale')
     parser.add_argument('--beta', type=float, default=1.0, help='beta scale')
+    parser.add_argument('--epsilon', type=float, default=0.05)
     parser.add_argument('--version', type=str, default='SCE0.0', help='Version')
     parser.add_argument('--dataset_type', choices=['cifar10', 'cifar100'], type=str, default='cifar10')
     parser.add_argument('--asym', action='store_true', default=False)
